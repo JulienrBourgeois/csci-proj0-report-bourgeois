@@ -16,9 +16,11 @@ Fashion-MNIST is 70,000 grayscale 28×28 clothing images in 10 classes (T-shirt/
 
 ![Ten Fashion-MNIST samples](figures/task1_fashion_mnist_samples.png)
 
-With labels, my brain immediately sees what each picture is — but that is a bit of cheating. The class name is already telling me the story. Unlabeled, it is a lot harder. These are blurry 28×28 blobs. Shoes are still obviously shoes, and heels versus sneakers are easy. Coat versus pullover is hard, dresses versus coats are not that easy, and even pants are not obvious. If nobody told me these were clothes, I could force a completely different story onto them.
+With labels, my brain immediately sees what each picture is — but that is cheating. The class name is already telling me the story. Unlabeled, these are blurry 28×28 blobs. Shoes are still obviously shoes, and heels versus sneakers are easy. Coat versus pullover is hard, dresses versus coats are not that easy, and even pants are not obvious. If nobody told me these were clothes, I could force a completely different story onto them.
 
-That is also why we flatten each image to 784 numbers before the MLP. A standard fully connected layer is built for a 1-D vector. It has no built-in mechanism for a 2-D grid of pixels, so we unroll the picture first.
+That last part is about me, not the net. The MLP never has to invent a category. It only ever picks among the ten clothing labels we gave it, which is why a blurry blob can still get a confident “coat.” What it *does* share with the unlabeled view is the hard pairs. Coat/pullover and dress/coat are the mistakes I would expect to eat most of the leftover 13%.
+
+We flatten each image to 784 numbers because a standard fully connected layer is built for a 1-D vector. It has no built-in way to treat a 2-D grid, so pixels that were neighbors in the picture are just 784 independent numbers. That is a real handicap, not a formatting detail: the model never gets to use the layout of a sleeve or a neckline.
 
 The baseline is flatten → Linear(784 → 256) → ReLU → Linear(256 → 10) logits. Training used SGD (learning rate 0.1), `CrossEntropyLoss`, batch size 256, and 10 epochs. There is no softmax on the last layer: PyTorch's `CrossEntropyLoss` already applies it internally, so putting another one on the model would be redundant.
 
@@ -26,9 +28,9 @@ After 10 epochs: train loss 0.380, val loss 0.375, val accuracy **0.868**.
 
 ![Baseline training curves](figures/task1_baseline_curves.png)
 
-Val bounced instead of snapping into a perfect copy of the training curve. At epoch 5 it actually got worse (0.478) before coming back down. Over the full run it gradually moved toward the training loss rather than pulling away. I do not read that as overfitting — val never ran off while train kept falling — and I do not read it as underfitting either, because both losses came down and the model improved on held-out data.
+Val bounced instead of copying train. At epoch 5 it got worse (0.478) before coming back down. That one ugly epoch is not a diagnosis by itself: the val set is only 6,000 images, so the estimate is noisier than train, and learning rate 0.1 is aggressive. Over the full run val drifted toward train rather than pulling away. I do not read that as overfitting — val never ran off while train kept falling — and I do not read it as underfitting, because both losses came down and held-out accuracy improved.
 
-87% feels definitely good, especially since I do not have a lot of experience training models. I would expect higher with more data or with techniques that make training more efficient. This was not a pretrained model. Torchvision only downloaded Fashion-MNIST; the MLP started from random weights and we trained it ourselves.
+87% is about what this setup should look like. We already have 54,000 training images, so “more data” is not the obvious missing piece. The model never sees the picture as a grid, and the remaining errors should live in the pairs that were already hard to tell apart at 28×28. This was not a pretrained model. Torchvision only downloaded Fashion-MNIST; the MLP started from random weights and we trained it ourselves.
 
 ### Task 2: Hidden layers and model capacity
 
