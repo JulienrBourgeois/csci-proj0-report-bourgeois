@@ -20,7 +20,7 @@ Fashion-MNIST is a clothing-themed replacement for the original MNIST digit data
 
 These are not photographs you would recognize at a glance. They are pixelated catalog thumbnails, and once a class name is printed above an image my brain fills in the rest, which is a kind of cheating: the label is already telling me what I am supposed to see. Cover the labels and the same pictures are much harder. Footwear still reads as shoes, and a heel is easy to separate from a sneaker, but coat versus pullover is genuinely difficult, dress versus coat is not much easier, and even pants are not obvious. If nobody had told me these were clothes, I could have talked myself into a completely different story. The model will not have that freedom, because it is only allowed to pick among those ten names. In practice, then, the dataset is a pile of low-resolution clothing images, a short list of labels, and a handful of pairs that still look alike even to a person.
 
-The baseline is a multilayer perceptron. A fully connected layer is built to take a 1-D list of numbers rather than a 2-D grid, so we flatten each 28×28 picture into 784 values before the first linear layer. The architecture is flatten → Linear(784 → 256) → ReLU → Linear(256 → 10) logits, trained with SGD at learning rate 0.1, `CrossEntropyLoss`, batch size 256, and 10 epochs. There is no softmax on the last layer, because PyTorch's `CrossEntropyLoss` already applies it internally and putting another one on the model would just duplicate that work. This was also not a pretrained network: Torchvision only downloaded the images, and the MLP started from random weights.
+The baseline is a multilayer perceptron. A fully connected layer is built to take a 1-D list of numbers rather than a 2-D grid, so we flatten each 28×28 picture into 784 values before the first linear layer. The architecture is flatten → Linear(784 → 256) → ReLU → Linear(256 → 10) logits, trained with SGD at learning rate 0.1, `CrossEntropyLoss`, batch size 256, and 10 epochs. There is no softmax on the last layer, because PyTorch's `CrossEntropyLoss` expects raw logits and applies log-softmax internally; a softmax on the model would just duplicate that work. This was also not a pretrained network: Torchvision only downloaded the images, and the MLP started from random weights.
 
 After 10 epochs the training loss was 0.380, the validation loss was 0.375, and validation accuracy was **0.868**.
 
@@ -28,21 +28,29 @@ After 10 epochs the training loss was 0.380, the validation loss was 0.375, and 
 
 The validation curve bounced instead of tracking the training curve smoothly. At epoch 5 the validation loss actually got worse (0.478) before coming back down, which is not a diagnosis by itself: the validation set is only 6,000 images, so that estimate is noisier than the training loss, and a learning rate of 0.1 is aggressive enough to produce an ugly epoch. Over the full run, validation drifted toward training rather than pulling away. I do not read that as overfitting, because validation never ran off while training kept falling, and I do not read it as underfitting, because both losses came down and accuracy on held-out data improved.
 
-That 87% also matches what looking at the pictures led me to expect. Footwear was already easy for a human, so the remaining mistakes should mostly be the lookalike tops — coat versus pullover, dress versus coat. Flattening throws away the 2-D layout on top of that, which means this network is not looking at a sleeve the way a person does; it is classifying a list of 784 pixel values. We already have 54,000 training images, so the limit here is more the model than the size of the dataset.
+That 87% also matches what looking at the pictures led me to expect. Footwear was already easy for a human, so I would guess the remaining mistakes are concentrated in lookalike tops — coat versus pullover, dress versus coat. We did not plot a confusion matrix, so that is a reading of the samples rather than a measured error breakdown. Flattening throws away the 2-D layout on top of that, which means this network is not looking at a sleeve the way a person does; it is classifying a list of 784 pixel values. We already have 54,000 training images, so the limit here is more the model than the size of the dataset.
 
 ### Task 2: Hidden layers and model capacity
+
+Task 1 already suggested that the ceiling on this experiment is the model, not the number of images. This task keeps the same data, optimizer, loss, batch size, and 10 epochs, and only changes how much hidden capacity the MLP has.
 
 **Extra hidden layer** (`784 → 256 → 256 → 10`)
 
 ![Two hidden layers](figures/task2_two_hidden_layers.png)
 
-*TODO: compare this run to Task 1. Val accuracy landed around 0.871. Was the extra layer worth it, or basically a wash? Did the curves look any healthier?*
+Adding a second 256-unit layer takes the network from about 204k parameters to about 269k. After 10 epochs the training loss was 0.361, the validation loss was 0.354, and validation accuracy was **0.871**. That is three tenths of a point above the Task 1 baseline of 0.868, which on a 6,000-image validation set is about 18 extra correct labels. I do not treat that as a real improvement. It is a wash, and I would not bother stacking the extra layer: it makes the model more complicated for no meaningful gain, which is the Occam's-razor argument against it.
+
+The curves tell the same story as Task 1 rather than a healthier one. Validation still bumps — this time at epoch 4, when val loss rose from 0.493 to 0.513 while training kept falling — and then drifts back toward the training loss. Extra wiggles are not a sign of a better run; they are the same noisy validation estimate and the same aggressive learning rate. Extra fully connected depth also does not restore the 2-D layout we flattened away in Task 1. You can only add so many of these layers before you are just making a bigger list-processor, which is probably the wrong kind of model for these thumbnails.
 
 **One-neuron hidden layer** (`784 → 1 → 10`)
 
 ![One-neuron bottleneck](figures/task2_one_neuron.png)
 
-*TODO: val accuracy around 0.390. Everything after that layer only sees one number per image. Tie this back to Task 1: if coat vs pullover is already hard for a human looking at all 784 pixels, what happens when the net is forced to squash the whole picture into a single scalar?*
+The opposite experiment is an extreme bottleneck: 784 pixels are linearly combined into a single hidden unit, ReLU is applied, and then ten class scores are read off that one number. The whole network has 805 parameters. After 10 epochs the losses were still around 1.44, and validation accuracy was **0.390**.
+
+That one hidden value is not a secret clothing code. It is one weighted sum of the whole picture, so the network has to line all ten classes up on a single axis. One scalar cannot separate coat from pullover, and it cannot even be trusted to keep shoe, shirt, and bag in different places if those classes overlap on that axis. Random guessing among ten balanced classes is 10%, so 39% means the tiny net did find some coarse signal — maybe how filled-in the thumbnail is, or footwear versus tops — but we did not inspect the weights, so that is a guess about *what* it latched onto. What is not a guess is that it failed the actual 10-way task: 39% is far from the 87% of the 256-unit net, which is what you would expect if coat versus pullover is already hard when a person can see all 784 pixels.
+
+The one-neuron curves were still drifting down at epoch 10, so a longer run might pick up a few more points. They will not close the gap to 87%. The losses never left the 1.4–1.9 range, which is the signature of a model that is too small, not a model that merely needed more time.
 
 ### Task 3: Activation functions and gradients
 
