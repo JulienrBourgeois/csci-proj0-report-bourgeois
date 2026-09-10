@@ -10,19 +10,21 @@ This report has two independent parts: a Fashion-MNIST MLP classifier, and Engli
 
 ## Part 1: Multilayer Perceptrons on Fashion-MNIST
 
-Fashion-MNIST is 70,000 grayscale 28×28 clothing images in 10 classes (T-shirt/top, Trouser, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, Ankle boot). Torchvision downloads the official split (60,000 train / 10,000 test). We hold out 10% of the official training set for validation: 54,000 train / 6,000 val / 10,000 test. Pixels are scaled to `[0, 1]`.
+This part trains a small neural net to classify a clothing thumbnail into one of ten categories.
 
 ### Task 1: Dataset and baseline model
 
+Fashion-MNIST is a drop-in clothing version of MNIST. Every image is 28×28, grayscale, with one item roughly centered in the frame. The ten labels are T-shirt/top, Trouser, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, and Ankle boot. There are 70,000 images. Torchvision downloads the official 60,000 / 10,000 train/test split. We hold out 10% of the official training set for validation, so the loaders we actually train on are 54,000 train / 6,000 val / 10,000 test. Pixel values are scaled to `[0, 1]`.
+
+Those are the stats. This is what the pictures actually look like:
+
 ![Ten Fashion-MNIST samples](figures/task1_fashion_mnist_samples.png)
 
-With labels, my brain immediately sees what each picture is — but that is cheating. The class name is already telling me the story. Unlabeled, these are blurry 28×28 blobs. Shoes are still obviously shoes, and heels versus sneakers are easy. Coat versus pullover is hard, dresses versus coats are not that easy, and even pants are not obvious. If nobody told me these were clothes, I could force a completely different story onto them.
+They are not sharp photos. They are pixelated catalog thumbnails. With the class name printed above an image, my brain fills in the rest — that is cheating. Cover the labels and it gets harder. Footwear still reads as shoes, and a heel is easy to tell from a sneaker. Coat versus pullover is hard. Dress versus coat is not that easy. Pants are not obvious either. If nobody had told me these were clothes, I could have talked myself into a different story. The model will not have that problem: it is only allowed to pick among those ten names.
 
-That last part is about me, not the net. The MLP never has to invent a category. It only ever picks among the ten clothing labels we gave it, which is why a blurry blob can still get a confident “coat.” What it *does* share with the unlabeled view is the hard pairs. Coat/pullover and dress/coat are the mistakes I would expect to eat most of the leftover 13%.
+That is the dataset: low-resolution clothes, ten names, and some pairs that still look alike even to a person.
 
-We flatten each image to 784 numbers because a standard fully connected layer is built for a 1-D vector. It has no built-in way to treat a 2-D grid, so pixels that were neighbors in the picture are just 784 independent numbers. That is a real handicap, not a formatting detail: the model never gets to use the layout of a sleeve or a neckline.
-
-The baseline is flatten → Linear(784 → 256) → ReLU → Linear(256 → 10) logits. Training used SGD (learning rate 0.1), `CrossEntropyLoss`, batch size 256, and 10 epochs. There is no softmax on the last layer: PyTorch's `CrossEntropyLoss` already applies it internally, so putting another one on the model would be redundant.
+The baseline model is a multilayer perceptron. A fully connected layer only takes a 1-D list of numbers, not a 2-D grid, so we flatten the 28×28 picture into 784 values first. The architecture is flatten → Linear(784 → 256) → ReLU → Linear(256 → 10) logits. Training used SGD (learning rate 0.1), `CrossEntropyLoss`, batch size 256, and 10 epochs. There is no softmax on the last layer: PyTorch's `CrossEntropyLoss` already applies it internally. This was not a pretrained model. Torchvision only downloaded the images; the MLP started from random weights.
 
 After 10 epochs: train loss 0.380, val loss 0.375, val accuracy **0.868**.
 
@@ -30,7 +32,7 @@ After 10 epochs: train loss 0.380, val loss 0.375, val accuracy **0.868**.
 
 Val bounced instead of copying train. At epoch 5 it got worse (0.478) before coming back down. That one ugly epoch is not a diagnosis by itself: the val set is only 6,000 images, so the estimate is noisier than train, and learning rate 0.1 is aggressive. Over the full run val drifted toward train rather than pulling away. I do not read that as overfitting — val never ran off while train kept falling — and I do not read it as underfitting, because both losses came down and held-out accuracy improved.
 
-87% is about what this setup should look like. We already have 54,000 training images, so “more data” is not the obvious missing piece. The model never sees the picture as a grid, and the remaining errors should live in the pairs that were already hard to tell apart at 28×28. This was not a pretrained model. Torchvision only downloaded Fashion-MNIST; the MLP started from random weights and we trained it ourselves.
+87% matches what the pictures led me to expect. Footwear was already easy. The remaining mistakes should mostly be the lookalike tops — coat vs pullover, dress vs coat. Flattening also throws away the 2-D layout, so this net is not “looking at” a sleeve the way a person does; it is classifying a list of 784 pixel values. We already have 54,000 training images, so the limit here is more the model than the dataset size.
 
 ### Task 2: Hidden layers and model capacity
 
