@@ -2,8 +2,6 @@
 title: Project 0 — PyTorch Warmup
 ---
 
-# Project 0: PyTorch Warmup
-
 **Name:** Julien Bourgeois
 
 This report has two independent parts: a Fashion-MNIST MLP classifier, and English–French translation with Bahdanau attention.
