@@ -54,17 +54,21 @@ The one-neuron curves were still drifting down at epoch 10, so a longer run migh
 
 ### Task 3: Activation functions and gradients
 
-Same width `(256, 256)`, ReLU vs sigmoid.
+Task 2 changed how *much* hidden capacity the MLP had. This task keeps the two-layer width (`256, 256`) and only changes the bend after each linear layer: ReLU versus sigmoid. Same data, same SGD, same 10 epochs. An activation is what stops stacked linear layers from collapsing into one linear map. ReLU zeros negatives and leaves positives alone. Sigmoid squishes every number into `(0, 1)` with an S-curve whose two ends are almost flat.
 
 ![ReLU vs sigmoid loss](figures/task3_relu_vs_sigmoid.png)
 
-*TODO: compare final val accuracy and the shape of the curves. Starter numbers: ReLU about 0.868, sigmoid about 0.764 after 10 epochs.*
+ReLU finished at train loss 0.364, val loss 0.357, and validation accuracy **0.868**, the same neighborhood as Task 1. Sigmoid finished at 0.645 / 0.620 / **0.764**. ReLU won this run. Sigmoid is still climbing at epoch 10, so it is not frozen at chance, but it started far behind — about 25% val accuracy at epoch 1 against ReLU’s 74% — and it never caught up. Swapping the activation dropped about ten points. Adding a ReLU layer in Task 2 had not.
+
+The reason is how training actually updates the first layer, the one that sees the 784 pixels. Each update follows the gradient: if a weight barely changes the loss when you nudge it, it barely learns. On the flat parts of a sigmoid, that nudge does almost nothing, and those tiny factors multiply through a stack. The last hidden layer can still see a signal; the pixel layer gets starved. That is vanishing gradients. It is a learning bottleneck, not the size bottleneck from the one-neuron net.
+
+The next two figures are a *different* experiment, used to make that mechanism visible: four hidden layers instead of two, random weights rather than a trained classifier, five minibatches, plotting the L2 gradient norm at each hidden layer. `hidden_0` is closest to the pixels; `hidden_3` is closest to the ten class scores. This is not another accuracy run, and it is deeper than the ReLU-versus-sigmoid training plot, so it should not be read as a copy of that 76% vs 87% result. It is the probe for why sigmoid is a bad stack.
 
 ![Sigmoid gradient norms](figures/task3_sigmoid_grad_norms.png)
 
 ![ReLU gradient norms](figures/task3_relu_grad_norms.png)
 
-*TODO: vanishing gradients. Sigmoid saturates, so its derivative is near zero for large |x|. Those small factors multiply through a deep stack and starve the earliest layers. ReLU does not saturate on the positive side, so early-layer norms usually stay larger at the same depth.*
+On the sigmoid plot (log scale) the last hidden layer sits around `0.14` and the first around `0.0007`, roughly two hundred times smaller. The pixel layer is almost dead. On the ReLU plot the first layer is actually the largest, and the later layers stay in the same order of magnitude. That is not the same failure. ReLU does not squash everything onto a flat S, so a useful gradient can still reach the weights that look at the picture. That is why I would keep ReLU for this MLP and why sigmoid lost the 10-epoch comparison even at only two hidden layers.
 
 ### Task 4: Computational considerations
 
