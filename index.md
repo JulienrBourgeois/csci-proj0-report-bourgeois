@@ -4,35 +4,31 @@ title: Project 0 — PyTorch Warmup
 
 **Name:** Julien Bourgeois
 
-This report has two independent parts: a Fashion-MNIST MLP classifier, and English–French translation with Bahdanau attention.
+This report covers two independent PyTorch experiments: a Fashion-MNIST classifier built from a multilayer perceptron, and an English–French translator that uses Bahdanau attention.
 
 ---
 
 ## Part 1: Multilayer Perceptrons on Fashion-MNIST
 
-This part trains a small neural net to classify a clothing thumbnail into one of ten categories.
+The first experiment is a classification problem. Given a tiny grayscale picture of a clothing item, the model has to assign it to one of ten categories.
 
 ### Task 1: Dataset and baseline model
 
-Fashion-MNIST is a drop-in clothing version of MNIST. Every image is 28×28, grayscale, with one item roughly centered in the frame. The ten labels are T-shirt/top, Trouser, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, and Ankle boot. There are 70,000 images. Torchvision downloads the official 60,000 / 10,000 train/test split. We hold out 10% of the official training set for validation, so the loaders we actually train on are 54,000 train / 6,000 val / 10,000 test. Pixel values are scaled to `[0, 1]`.
-
-Those are the stats. This is what the pictures actually look like:
+Fashion-MNIST is a clothing-themed replacement for the original MNIST digit dataset: 70,000 images, each 28×28 and grayscale, with a single item roughly centered in the frame. The ten labels are T-shirt/top, Trouser, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, and Ankle boot. Torchvision downloads the official 60,000 / 10,000 train/test split, and we hold out 10% of the official training set for validation, which leaves 54,000 images for training, 6,000 for validation, and 10,000 for test. Pixel intensities are scaled to the range `[0, 1]`. The numbers describe the collection; the figure below is what it actually looks like.
 
 ![Ten Fashion-MNIST samples](figures/task1_fashion_mnist_samples.png)
 
-They are not sharp photos. They are pixelated catalog thumbnails. With the class name printed above an image, my brain fills in the rest — that is cheating. Cover the labels and it gets harder. Footwear still reads as shoes, and a heel is easy to tell from a sneaker. Coat versus pullover is hard. Dress versus coat is not that easy. Pants are not obvious either. If nobody had told me these were clothes, I could have talked myself into a different story. The model will not have that problem: it is only allowed to pick among those ten names.
+These are not photographs you would recognize at a glance. They are pixelated catalog thumbnails, and once a class name is printed above an image my brain fills in the rest, which is a kind of cheating: the label is already telling me what I am supposed to see. Cover the labels and the same pictures are much harder. Footwear still reads as shoes, and a heel is easy to separate from a sneaker, but coat versus pullover is genuinely difficult, dress versus coat is not much easier, and even pants are not obvious. If nobody had told me these were clothes, I could have talked myself into a completely different story. The model will not have that freedom, because it is only allowed to pick among those ten names. In practice, then, the dataset is a pile of low-resolution clothing images, a short list of labels, and a handful of pairs that still look alike even to a person.
 
-That is the dataset: low-resolution clothes, ten names, and some pairs that still look alike even to a person.
+The baseline is a multilayer perceptron. A fully connected layer is built to take a 1-D list of numbers rather than a 2-D grid, so we flatten each 28×28 picture into 784 values before the first linear layer. The architecture is flatten → Linear(784 → 256) → ReLU → Linear(256 → 10) logits, trained with SGD at learning rate 0.1, `CrossEntropyLoss`, batch size 256, and 10 epochs. There is no softmax on the last layer, because PyTorch's `CrossEntropyLoss` already applies it internally and putting another one on the model would just duplicate that work. This was also not a pretrained network: Torchvision only downloaded the images, and the MLP started from random weights.
 
-The baseline model is a multilayer perceptron. A fully connected layer only takes a 1-D list of numbers, not a 2-D grid, so we flatten the 28×28 picture into 784 values first. The architecture is flatten → Linear(784 → 256) → ReLU → Linear(256 → 10) logits. Training used SGD (learning rate 0.1), `CrossEntropyLoss`, batch size 256, and 10 epochs. There is no softmax on the last layer: PyTorch's `CrossEntropyLoss` already applies it internally. This was not a pretrained model. Torchvision only downloaded the images; the MLP started from random weights.
-
-After 10 epochs: train loss 0.380, val loss 0.375, val accuracy **0.868**.
+After 10 epochs the training loss was 0.380, the validation loss was 0.375, and validation accuracy was **0.868**.
 
 ![Baseline training curves](figures/task1_baseline_curves.png)
 
-Val bounced instead of copying train. At epoch 5 it got worse (0.478) before coming back down. That one ugly epoch is not a diagnosis by itself: the val set is only 6,000 images, so the estimate is noisier than train, and learning rate 0.1 is aggressive. Over the full run val drifted toward train rather than pulling away. I do not read that as overfitting — val never ran off while train kept falling — and I do not read it as underfitting, because both losses came down and held-out accuracy improved.
+The validation curve bounced instead of tracking the training curve smoothly. At epoch 5 the validation loss actually got worse (0.478) before coming back down, which is not a diagnosis by itself: the validation set is only 6,000 images, so that estimate is noisier than the training loss, and a learning rate of 0.1 is aggressive enough to produce an ugly epoch. Over the full run, validation drifted toward training rather than pulling away. I do not read that as overfitting, because validation never ran off while training kept falling, and I do not read it as underfitting, because both losses came down and accuracy on held-out data improved.
 
-87% matches what the pictures led me to expect. Footwear was already easy. The remaining mistakes should mostly be the lookalike tops — coat vs pullover, dress vs coat. Flattening also throws away the 2-D layout, so this net is not “looking at” a sleeve the way a person does; it is classifying a list of 784 pixel values. We already have 54,000 training images, so the limit here is more the model than the dataset size.
+That 87% also matches what looking at the pictures led me to expect. Footwear was already easy for a human, so the remaining mistakes should mostly be the lookalike tops — coat versus pullover, dress versus coat. Flattening throws away the 2-D layout on top of that, which means this network is not looking at a sleeve the way a person does; it is classifying a list of 784 pixel values. We already have 54,000 training images, so the limit here is more the model than the size of the dataset.
 
 ### Task 2: Hidden layers and model capacity
 
