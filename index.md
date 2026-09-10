@@ -72,13 +72,13 @@ On the sigmoid plot (log scale) the last hidden layer sits around `0.14` and the
 
 ### Task 4: Computational considerations
 
-*TODO: no extra plot. Cover, in your own words:*
+There is no extra plot for this task. The question is why **training** the MLP used more memory than **using** it to classify a new thumbnail.
 
-- Parameters are stored in both training and prediction.
-- Training also stores activations for backprop, parameter gradients, and optimizer state.
-- Prediction can use `torch.no_grad()` and only needs weights plus the current layer's activations.
-- Batch size, width, and depth all scale activation memory.
-- These runs used MPS (Apple GPU) when available, otherwise CPU; the same memory accounting applies.
+The **weights** exist in both phases. That is the model: about 204k numbers in the Task 1 baseline, 269k with the extra hidden layer, 805 in the one-neuron net. If those go away, there is nothing to run. Prediction, with the weights frozen, still needs them and nothing else from the training scratchpad: not gradients, not saved activations for backprop, and not optimizer state. Our eval path is wrapped in `torch.no_grad()`, which means PyTorch does not record a backward tape. It still computes hidden values for the current batch, then it can throw them away.
+
+Training keeps extra copies. After a forward pass it **stores activations** so backprop can walk back through the net, and it stores a **gradient** for every weight — roughly another copy of the parameter tensor. Some optimizers also keep running buffers (momentum, Adam). Ours was plain SGD with no momentum: a minibatch gradient step at learning rate 0.1, no extra momentum buffers. That skips one training cost. It does not make training as cheap as prediction, because the activation tape and the gradients are still there.
+
+The part that scales is the activation scratchpad, not the 204k weights. A bigger batch does not mean more loops over the 54,000 images; an epoch still sees each example once, and a larger batch actually takes fewer steps. It means more images **at once**, so hidden activations are `B × 256` instead of a small `B`. Width and depth do the same thing: Task 2’s extra 256-unit layer is another full set of activations to keep; the one-neuron net barely has a hidden tensor. These runs lived on MPS (the Mac GPU) when it was available, otherwise CPU. The accounting is the same; only which pile of RAM holds the tensors changes.
 
 ---
 
