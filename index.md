@@ -8,43 +8,29 @@ title: Project 0 — PyTorch Warmup
 
 This report has two independent parts: a Fashion-MNIST MLP classifier, and English–French translation with Bahdanau attention.
 
-> Draft skeleton. Replace every *TODO* with your own writing. Keep the figures. Do not paste code here.
-
 ---
 
 ## Part 1: Multilayer Perceptrons on Fashion-MNIST
 
-### Data
-
-Fashion-MNIST is 70,000 grayscale 28×28 clothing images in 10 classes (T-shirt/top, Trouser, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, Ankle boot).
-
-Torchvision downloads the official split (60,000 train / 10,000 test). We hold out 10% of the official training set for validation:
-
-- train: 54,000
-- val: 6,000
-- test: 10,000
-
-Pixels are scaled to `[0, 1]`. Images stay shaped `(1, 28, 28)` in the loader and are flattened to 784 inside the MLP.
-
-*TODO (optional): one sentence on why a validation split is useful.*
+Fashion-MNIST is 70,000 grayscale 28×28 clothing images in 10 classes (T-shirt/top, Trouser, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, Ankle boot). Torchvision downloads the official split (60,000 train / 10,000 test). We hold out 10% of the official training set for validation: 54,000 train / 6,000 val / 10,000 test. Pixels are scaled to `[0, 1]`.
 
 ### Task 1: Dataset and baseline model
 
 ![Ten Fashion-MNIST samples](figures/task1_fashion_mnist_samples.png)
 
-**Architecture**
+With labels, my brain immediately sees what each picture is — but that is a bit of cheating. The class name is already telling me the story. Unlabeled, it is a lot harder. These are blurry 28×28 blobs. Shoes are still obviously shoes, and heels versus sneakers are easy. Coat versus pullover is hard, dresses versus coats are not that easy, and even pants are not obvious. If nobody told me these were clothes, I could force a completely different story onto them.
 
-*TODO: layer sizes, activation, loss, optimizer, batch size, epochs. Starter facts from the run: flatten 784 → Linear(256) → ReLU → Linear(10) logits. SGD, learning rate 0.1, CrossEntropyLoss, batch 256, 10 epochs. No softmax on the last layer because CrossEntropyLoss expects logits.*
+That is also why we flatten each image to 784 numbers before the MLP. A standard fully connected layer is built for a 1-D vector. It has no built-in mechanism for a 2-D grid of pixels, so we unroll the picture first.
 
-**Results**
+The baseline is flatten → Linear(784 → 256) → ReLU → Linear(256 → 10) logits. Training used SGD (learning rate 0.1), `CrossEntropyLoss`, batch size 256, and 10 epochs. There is no softmax on the last layer: PyTorch's `CrossEntropyLoss` already applies it internally, so putting another one on the model would be redundant.
 
-*TODO: final train loss, val loss, val accuracy. Starter numbers from the run: val accuracy about 0.868; train and val loss both ended around 0.38.*
+After 10 epochs: train loss 0.380, val loss 0.375, val accuracy **0.868**.
 
 ![Baseline training curves](figures/task1_baseline_curves.png)
 
-**Underfitting / overfitting**
+Val bounced instead of snapping into a perfect copy of the training curve. At epoch 5 it actually got worse (0.478) before coming back down. Over the full run it gradually moved toward the training loss rather than pulling away. I do not read that as overfitting — val never ran off while train kept falling — and I do not read it as underfitting either, because both losses came down and the model improved on held-out data.
 
-*TODO: a few sentences. Did train and val loss move together, or did val get worse while train kept falling?*
+87% feels definitely good, especially since I do not have a lot of experience training models. I would expect higher with more data or with techniques that make training more efficient. This was not a pretrained model. Torchvision only downloaded Fashion-MNIST; the MLP started from random weights and we trained it ourselves.
 
 ### Task 2: Hidden layers and model capacity
 
@@ -52,13 +38,13 @@ Pixels are scaled to `[0, 1]`. Images stay shaped `(1, 28, 28)` in the loader an
 
 ![Two hidden layers](figures/task2_two_hidden_layers.png)
 
-*TODO: how did extra depth change training loss vs validation accuracy vs the Task 1 baseline? Starter number: val accuracy about 0.871.*
+*TODO: compare this run to Task 1. Val accuracy landed around 0.871. Was the extra layer worth it, or basically a wash? Did the curves look any healthier?*
 
 **One-neuron hidden layer** (`784 → 1 → 10`)
 
 ![One-neuron bottleneck](figures/task2_one_neuron.png)
 
-*TODO: this is an extreme information bottleneck — everything after that layer only sees one number per image. Relate that to the accuracy you got. Starter number: val accuracy about 0.390.*
+*TODO: val accuracy around 0.390. Everything after that layer only sees one number per image. Tie this back to Task 1: if coat vs pullover is already hard for a human looking at all 784 pixels, what happens when the net is forced to squash the whole picture into a single scalar?*
 
 ### Task 3: Activation functions and gradients
 
