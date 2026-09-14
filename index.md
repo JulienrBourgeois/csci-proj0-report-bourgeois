@@ -126,18 +126,28 @@ The model learned some local French patterns — `il est`, `je suis`, a period a
 
 ### Task 2: Visualize and interpret attention
 
-![Attention example 0](figures/task2_attention_0.png)
+The three heatmaps are from setting A, the same run as the example translations. Each row is one generated French token. Each column is one English token, including the source `<eos>`. Yellow means that French step put almost all of its attention on that English position; dark purple means almost none. A useful map would be roughly diagonal: `il` on `he`, `est` on `is`, the noun on `teacher`. Pads are already masked in the model, so these plots do not have a padding column. Mass on `<eos>` here is the real end-of-sentence token, not a dummy pad.
 
-*TODO: what does each generated French token attend to? Is this helpful or unsuccessful?*
+**`i'm ok .` → `j ' ai passé votre travail .`**
 
-![Attention example 1](figures/task2_attention_1.png)
+![Attention on I'm ok](figures/task2_attention_0.png)
 
-*TODO: look for a helpful pattern (a noun attending to its English counterpart, or a roughly diagonal alignment).*
+This map is unsuccessful. `j` (I) should look at `i`; it peaks on `m` (0.39) and then `ok` (0.23), with only 0.09 on `i`. The apostrophe and `ai` are almost uniform and both peak on source `<eos>`. `passé` also peaks on `<eos>` (0.24) instead of on `ok`. `votre` peaks on `m`. `travail` peaks on `i` (0.27). The period puts 0.44 of its mass on `i` and only 0.06 on the English period. Nothing in this map is reading `ok` as the word that needs a French equivalent. The decoder is emitting a French-looking sentence while looking at the contraction and the start of the sentence.
 
-![Attention example 2](figures/task2_attention_2.png)
+**`he is a teacher .` → `il est un homme .`**
 
-*TODO: look for an unsuccessful pattern (mass on `<eos>` / pad, ignored source tokens, repeated generation, off-by-one).*
+![Attention on he is a teacher](figures/task2_attention_1.png)
 
-**Helpful example:** *TODO: which heatmap, and why.*
+The first row is the helpful pattern. `il` puts 0.67 of its mass on `he` and 0.29 on `is`, and almost nothing on `teacher` or the period. That is the alignment you would want for a subject pronoun.
 
-**Unsuccessful example:** *TODO: which heatmap, and why.*
+The rest of the map does not follow through. `est` should peak on `is`; after it avoids `he`, the row is almost flat, and the largest weight is source `<eos>` (0.21). `un` peaks on `he` (0.21) rather than on `a` (0.17). `homme` does put its largest weight on `teacher` (0.20), but that row is flat — `a`, the period, and `<eos>` are all around 0.19 — so it is not locked onto the noun. The model still wrote `homme` (man) instead of `professeur`. Attention on the right column is not enough if the next-token distribution prefers a more common word. The period and `<eos>` both go back to `he`.
+
+**`i lost .` → `je me suis senti .`**
+
+![Attention on I lost](figures/task2_attention_2.png)
+
+Almost every row after `je` piles onto `lost`. `je` is split between `i` (0.36) and `lost` (0.38). `suis`, `senti`, the period, and `<eos>` all peak on `lost` (0.32–0.37). Finding the only content word is better than the `i'm ok` map, but it is not a successful translation: the model built the reflexive `je me suis senti` (I felt) instead of something like `j'ai perdu`. Looking at `lost` and then saying `senti` means the attention is on the right column and the vocabulary choice is still wrong.
+
+**Helpful example:** `he is a teacher .`, the `il` row. That is a real local alignment: the French subject pronoun attends to `he`.
+
+**Unsuccessful example:** `i'm ok .`. The map is not diagonal, several rows park on source `<eos>`, the period attends to `i`, and no generated token treats `ok` as the thing to translate. `i lost .` is a second failure of a different kind: mass on `lost` without producing `perdu`.
